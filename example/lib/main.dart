@@ -1,13 +1,9 @@
-import 'dart:io';
-
 import 'package:cross_file/cross_file.dart' show XFile;
-import 'package:device_info_plus/device_info_plus.dart';
+import 'package:example/src/ensure_permissions/ensure_permissions.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:path_provider/path_provider.dart';
-import 'package:permission_handler/permission_handler.dart';
 import 'package:tus_client_dart/tus_client_dart.dart';
-import 'package:tus_client_dart/tus_client_dart_io.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 void main() {
@@ -97,18 +93,11 @@ class _UploadPageState extends State<UploadPage> {
                       onPressed: _file == null
                           ? null
                           : () async {
-                              final tempDir = await getTemporaryDirectory();
-                              final tempDirectory = Directory(
-                                  '${tempDir.path}/${_file?.name}_uploads');
-                              if (!tempDirectory.existsSync()) {
-                                tempDirectory.createSync(recursive: true);
-                              }
-
                               // Create a client
                               print("Create a client");
                               _client = TusClient(
                                 _file!,
-                                store: TusFileStore(tempDirectory),
+                                store: TusMemoryStore(),
                                 maxChunkSize: 512 * 1024 * 10,
                               );
 
@@ -120,7 +109,6 @@ class _UploadPageState extends State<UploadPage> {
                                 },
                                 onComplete: () async {
                                   print("Completed!");
-                                  tempDirectory.deleteSync(recursive: true);
                                   setState(() => _fileUrl = _client!.uploadUrl);
                                 },
                                 onProgress: (progress, estimate) {
@@ -136,10 +124,6 @@ class _UploadPageState extends State<UploadPage> {
                                 metadata: {
                                   'testMetaData': 'testMetaData',
                                   'testMetaData2': 'testMetaData2',
-                                },
-                                headers: {
-                                  'testHeaders': 'testHeaders',
-                                  'testHeaders2': 'testHeaders2',
                                 },
                                 measureUploadSpeed: true,
                               );
@@ -239,7 +223,7 @@ class _UploadPageState extends State<UploadPage> {
 
     if (result != null) {
       final chosenFile = result.files.first;
-      if (chosenFile.path != null) {
+      if (!kIsWeb) {
         // Android, iOS, Desktop
         return XFile(chosenFile.path!);
       } else {
@@ -253,26 +237,4 @@ class _UploadPageState extends State<UploadPage> {
 
     return null;
   }
-
-  Future<bool> ensurePermissions() async {
-    var enableStorage = true;
-
-    if (Platform.isAndroid) {
-      final devicePlugin = DeviceInfoPlugin();
-      final androidDeviceInfo = await devicePlugin.androidInfo;
-      _androidSdkVersion = androidDeviceInfo.version.sdkInt;
-      enableStorage = _androidSdkVersion < 33;
-    }
-
-    final storage = enableStorage
-        ? await Permission.storage.status
-        : PermissionStatus.granted;
-    final photos = Platform.isIOS
-        ? await Permission.photos.status
-        : PermissionStatus.granted;
-
-    return storage.isGranted && photos.isGranted;
-  }
-
-  int _androidSdkVersion = 0;
 }
