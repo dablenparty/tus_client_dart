@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:developer';
-import 'dart:io';
 import 'dart:math' show min;
 import 'dart:typed_data' show Uint8List, BytesBuilder;
 import 'package:speed_test_dart/speed_test_dart.dart';
@@ -30,42 +29,38 @@ class TusClient extends TusClientBase {
 
   /// Create a new [upload] throwing [ProtocolException] on server error
   Future<void> createUpload() async {
-    try {
-      _fileSize = await file.length();
+    _fileSize = await file.length();
 
-      final client = getHttpClient();
-      final createHeaders = Map<String, String>.from(headers ?? {})
-        ..addAll({
-          "Tus-Resumable": tusVersion,
-          "Upload-Metadata": _uploadMetadata ?? "",
-          "Upload-Length": "$_fileSize",
-        });
+    final client = getHttpClient();
+    final createHeaders = Map<String, String>.from(headers ?? {})
+      ..addAll({
+        "Tus-Resumable": tusVersion,
+        "Upload-Metadata": _uploadMetadata ?? "",
+        "Upload-Length": "$_fileSize",
+      });
 
-      final _url = url;
+    final _url = url;
 
-      if (_url == null) {
-        throw ProtocolException('Error in request, URL is incorrect');
-      }
-
-      final response = await client.post(_url, headers: createHeaders);
-
-      if (!(response.statusCode >= 200 && response.statusCode < 300) &&
-          response.statusCode != 404) {
-        throw ProtocolException(
-            "Unexpected Error while creating upload", response.statusCode);
-      }
-
-      String urlStr = response.headers["location"] ?? "";
-      if (urlStr.isEmpty) {
-        throw ProtocolException(
-            "missing upload Uri in response for creating upload");
-      }
-
-      _uploadUrl = _parseUrl(urlStr);
-      store?.set(_fingerprint, _uploadUrl as Uri);
-    } on FileSystemException {
-      throw Exception('Cannot find file to upload');
+    if (_url == null) {
+      throw ProtocolException('Error in request, URL is incorrect');
     }
+
+    final response = await client.post(_url, headers: createHeaders);
+
+    if (!(response.statusCode >= 200 && response.statusCode < 300) &&
+        response.statusCode != 404) {
+      throw ProtocolException(
+          "Unexpected Error while creating upload", response.statusCode);
+    }
+
+    String urlStr = response.headers["location"] ?? "";
+    if (urlStr.isEmpty) {
+      throw ProtocolException(
+          "missing upload Uri in response for creating upload");
+    }
+
+    _uploadUrl = _parseUrl(urlStr);
+    store?.set(_fingerprint, _uploadUrl as Uri);
   }
 
   Future<bool> isResumable() async {
@@ -83,8 +78,6 @@ class TusClient extends TusClientBase {
         return false;
       }
       return true;
-    } on FileSystemException {
-      throw Exception('Cannot find file to upload');
     } catch (e) {
       return false;
     }
@@ -172,9 +165,6 @@ class TusClient extends TusClientBase {
     }
 
     while (!_pauseUpload && _offset < totalBytes) {
-      if (!File(file.path).existsSync()) {
-        throw Exception("Cannot find file ${file.path.split('/').last}");
-      }
       final uploadHeaders = Map<String, String>.from(headers ?? {})
         ..addAll({
           "Tus-Resumable": tusVersion,
